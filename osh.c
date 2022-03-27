@@ -23,6 +23,7 @@ typedef struct operator{
     bool pipe_oper;
 }operator;
 
+void initialize(char* input, char** args, char** pipe_args, operator* opers, int* i, int* file);
 void normalize(char* input, char** args, char** pipe_args, operator* opers, char** file_name);
 bool check_oper(char* sep, operator* opers, char** file_name);
 
@@ -41,17 +42,7 @@ int main(void){
 
     while(should_run){
         //initialization
-        memset(args, NULL, (MAX_LINE/2+1)*sizeof(char*));
-        memset(pipe_args, NULL, (MAX_LINE/2+1)*sizeof(char*));
-        memset(input, NULL, (MAX_LINE)*sizeof(char));
-        i = 0;
-        file = 0;
-        opers->write = false;
-        opers->read = false;
-        opers->ampersand = false;
-        opers->pipe_oper = false;
-        printf("osh>");
-        fflush(stdout);
+        initialize(input, args, pipe_args, opers, &i, &file);
         //end initialization
 
         //input
@@ -132,6 +123,20 @@ int main(void){
         }//end execuing block
     }//end while
     return 0;
+}
+
+void initialize(char* input, char** args, char** pipe_args, operator* opers, int* i, int* file){
+    memset(args, NULL, (MAX_LINE/2+1)*sizeof(char*));
+    memset(pipe_args, NULL, (MAX_LINE/2+1)*sizeof(char*));
+    memset(input, NULL, (MAX_LINE)*sizeof(char));
+    *i = 0;
+    *file = 0;
+    opers->write = false;
+    opers->read = false;
+    opers->ampersand = false;
+    opers->pipe_oper = false;
+    printf("osh>");
+    fflush(stdout);
 }
 
 void normalize(char* input, char** args, char** pipe_args, operator* opers, char** file_name) {
