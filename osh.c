@@ -10,10 +10,19 @@ typedef int bool;
 #define true  1
 #define false 0
 
+//for Convenient pipe operation
 #define WRITE 1
 #define READ  0
 
 #define MAX_LINE 80 /*The maximum length command*/
+
+typedef struct operator{
+    bool write;
+    bool read;
+    bool ampersand;
+    bool pipe_oper;
+}operator;
+void normalize(char* input, char** args, char** pipe_args, operator* opers, char** file_name);
 
 int main(void){
     char *args[MAX_LINE/2 + 1] = { NULL, };//command array
@@ -21,14 +30,11 @@ int main(void){
     char input[MAX_LINE] = { NULL, };//initial input
     char *file_name;//file name in commands
     char *sep;//seperator for parsing
+    int should_run = 1;
     int i;// i for parsing
     int status;
     int file; // iterator of open(), close()
-    bool should_run = true;
-    bool write_operation; //if '>' serves, it will be true.
-    bool read_operation; //if '<' serves, it will be true.
-    bool ampersand; //if '&' serves, it is will be true.
-    bool pipe_operation;//if '|' serves, it will be true.
+    operator *opers = malloc(sizeof(operator));
     pid_t pid;
 
     while(should_run){
@@ -38,10 +44,10 @@ int main(void){
         memset(input, NULL, (MAX_LINE)*sizeof(char));
         i = 0;
         file = 0;
-        write_operation = false;
-        read_operation = false;
-        ampersand = false;
-        pipe_operation = false;
+        opers->write = false;
+        opers->read = false;
+        opers->ampersand = false;
+        opers->pipe_oper = false;
         printf("osh>");
         fflush(stdout);
         //end initialization
@@ -50,50 +56,8 @@ int main(void){
         fgets(input, MAX_LINE, stdin);
         input[strlen(input)-1] = '\0';
 
-        //parsing and confirming input
-        sep = strtok(input, " ");
-        while (sep != NULL) {
-            if (strchr(sep,'<')) {
-                read_operation = true;
-                file_name = strtok(NULL," ");
-                break;
-            }
-            if (strchr(sep, '>')) {
-                write_operation = true;
-                file_name = strtok(NULL, " ");
-                break;
-            }
-            if (strchr(sep, '&')) {
-                ampersand = true;
-                break;
-            }
-            if (strchr(sep, '|')) {
-                i = 0;
-                pipe_operation = true;
-                sep = strtok(NULL, " ");//'|'날리기
-                while (sep != NULL) {
-                    if (strchr(sep,'<')) {
-                        read_operation = true;
-                        file_name = strtok(NULL," ");
-                        break;
-                    }
-                    if (strchr(sep, '>')) {
-                        write_operation = true;
-                        file_name = strtok(NULL, " ");
-                        break;
-                    }
-                    if (strchr(sep, '&')) {
-                        ampersand = true;
-                        break;
-                    }
-                    pipe_args[i++] = sep;
-                    sep = strtok(NULL, " ");
-                }
-                break;
-            }
-            args[i++] = sep;
-            sep = strtok(NULL, " ");
-        }//end parsing and confirming
+        //normalize input
+        normalize(input, args, pipe_args, opers, &file_name);
 
         //the end
         if (strcmp(args[0],"exit") == 0) {
@@ -112,7 +76,7 @@ int main(void){
                     fprintf(stderr, "FORK ERROR");
                     return 1;
                 } else if (pid == 0) {//child
-                    if (read_operation) {// < operator
+                    if (opers->read) {// < operator
                         file = open(file_name, O_CREAT | O_RDONLY);
                         if (file == -1) {
                             fprintf(stderr, "FILE_OPEN_FAILED");
@@ -120,7 +84,7 @@ int main(void){
                         }
                         dup2(file, STDIN_FILENO);
                     }//end < operator
-                    else if (write_operation) {// > operator
+                    else if (opers->write) {// > operator
                         file = open(file_name, O_CREAT | O_WRONLY, 0755);
                         if (file == -1) {
                             fprintf(stderr, "FILE_OPEN_FAILED");
@@ -128,7 +92,7 @@ int main(void){
                         }
                         dup2(file, STDOUT_FILENO);
                     }//end > operator
-                    else if (pipe_operation) {// using pipe
+                    else if (opers->pipe_oper) {// using pipe
                         int fd[2];
                         if(pipe(fd) == -1) {
                             fprintf(stderr, "PIPE ERROR");
@@ -155,7 +119,7 @@ int main(void){
                     exit(1);
                 }//end child
                 else {//parent
-                    if(ampersand){
+                    if(opers->ampersand){
                         waitpid(pid, &status, WNOHANG);
                     }
                     else{
@@ -166,4 +130,51 @@ int main(void){
         }//end execuing block
     }//end while
     return 0;
+}
+void normalize(char* input, char** args, char** pipe_args, operator* opers, char** file_name) {
+    char* sep;
+    int i = 0;
+    sep = strtok(input, " ");
+    while (sep != NULL) {
+        if (strchr(sep,'<')) {
+            opers->read = true;
+            *file_name = strtok(NULL," ");
+            break;
+        }
+        if (strchr(sep, '>')) {
+            opers->write = true;
+            *file_name = strtok(NULL, " ");
+            break;
+        }
+        if (strchr(sep, '&')) {
+            opers->ampersand = true;
+            break;
+        }
+        if (strchr(sep, '|')) {
+            i = 0;
+            opers->pipe_oper = true;
+            sep = strtok(NULL, " ");//'|'날리기
+            while (sep != NULL) {
+                if (strchr(sep,'<')) {
+                    opers->read = true;
+                    *file_name = strtok(NULL," ");
+                    break;
+                }
+                if (strchr(sep, '>')) {
+                    opers->write = true;
+                    *file_name = strtok(NULL, " ");
+                    break;
+                }
+                if (strchr(sep, '&')) {
+                    opers->ampersand = true;
+                    break;
+                }
+                pipe_args[i++] = sep;
+                sep = strtok(NULL, " ");
+            }
+            break;
+        }
+        args[i++] = sep;
+        sep = strtok(NULL, " ");
+    }
 }
