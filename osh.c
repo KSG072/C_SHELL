@@ -22,7 +22,9 @@ typedef struct operator{
     bool ampersand;
     bool pipe_oper;
 }operator;
+
 void normalize(char* input, char** args, char** pipe_args, operator* opers, char** file_name);
+bool check_oper(char* sep, operator* opers, char** file_name);
 
 int main(void){
     char *args[MAX_LINE/2 + 1] = { NULL, };//command array
@@ -131,23 +133,13 @@ int main(void){
     }//end while
     return 0;
 }
+
 void normalize(char* input, char** args, char** pipe_args, operator* opers, char** file_name) {
     char* sep;
     int i = 0;
     sep = strtok(input, " ");
     while (sep != NULL) {
-        if (strchr(sep,'<')) {
-            opers->read = true;
-            *file_name = strtok(NULL," ");
-            break;
-        }
-        if (strchr(sep, '>')) {
-            opers->write = true;
-            *file_name = strtok(NULL, " ");
-            break;
-        }
-        if (strchr(sep, '&')) {
-            opers->ampersand = true;
+        if (check_oper(sep, opers, file_name)){
             break;
         }
         if (strchr(sep, '|')) {
@@ -155,18 +147,7 @@ void normalize(char* input, char** args, char** pipe_args, operator* opers, char
             opers->pipe_oper = true;
             sep = strtok(NULL, " ");//'|'날리기
             while (sep != NULL) {
-                if (strchr(sep,'<')) {
-                    opers->read = true;
-                    *file_name = strtok(NULL," ");
-                    break;
-                }
-                if (strchr(sep, '>')) {
-                    opers->write = true;
-                    *file_name = strtok(NULL, " ");
-                    break;
-                }
-                if (strchr(sep, '&')) {
-                    opers->ampersand = true;
+                if (check_oper(sep, opers, file_name)){
                     break;
                 }
                 pipe_args[i++] = sep;
@@ -177,4 +158,23 @@ void normalize(char* input, char** args, char** pipe_args, operator* opers, char
         args[i++] = sep;
         sep = strtok(NULL, " ");
     }
+}
+
+bool check_oper(char* sep, operator* opers, char** file_name){
+    bool result = false;
+    if (strchr(sep,'<')) {
+        opers->read = true;
+        *file_name = strtok(NULL," ");
+        result = true;
+    }
+    else if (strchr(sep, '>')) {
+        opers->write = true;
+        *file_name = strtok(NULL, " ");
+        result = true;
+    }
+    else if (strchr(sep, '&')) {
+        opers->ampersand = true;
+        result = true;
+    }
+    return result;
 }
